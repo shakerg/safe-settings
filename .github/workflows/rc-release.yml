@@ -1,0 +1,55 @@
+# Simple workflow for deploying static content to GitHub Pages
+name: RC Release 
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions: write-all
+
+# Allow one concurrent deployment
+concurrency:
+  group: "rcrelease"
+  cancel-in-progress: true
+
+jobs:
+  rcrelease:
+    name: release
+    runs-on: ubuntu-latest
+    # if: ${{ github.event.issue.pull_request && github.event.comment.body == '/release'}}
+    if: contains(github.event.pull_request.labels.*.name, 'stage')
+    outputs:
+      release: ${{ steps.rcrelease.outputs.release }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16.x
+        cache: npm
+    - run: npm ci
+    - run: npm run build --if-present
+#    - run: npm test -- -u   
+    - name: Tag a rc release 
+      if: ${{ !github.event.pull_request.head.repo.fork }}
+      id: rcrelease
+      uses: actionsdesk/semver@0.6.0-rc.10
+      with:
+        prerelease: withBuildNumber
+        prelabel: rc
+        commitish: ${{ github.head_ref }}
+  
+#   package:
+#     needs: [rcrelease]
+#     runs-on: ubuntu-latest
+#     environment: staging
+#     steps:
+#     - uses: actions/checkout@v3
+#     - name: package to docker
+#       uses: ./.github/actions/publish-docker
+#       with:
+#         docker_username: ${{ secrets.DOCKER_USERNAME }}
+#         docker_password: ${{ secrets.DOCKER_PASSWORD }}
+#         tag: yadhav/safe-settings:${{needs.rcrelease.outputs.release}}
